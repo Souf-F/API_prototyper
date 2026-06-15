@@ -1,0 +1,540 @@
+openapi: 3.0.3
+info:
+  title: Cyber Cheatsheets API
+  description: >
+    API pour un site de fiches de révision cybersécurité (style Matrix),
+    avec progression gamifiée : XP, rangs, badges, et demandes de fiches.
+  version: 1.0.0
+
+tags:
+  - name: Categories
+    description: Catégories de fiches
+  - name: Fiches
+    description: Fiches de révision
+  - name: Users
+    description: Profils anonymes et progression
+  - name: Ranks
+    description: Système de rangs basé sur l'XP
+  - name: Badges
+    description: Récompenses débloquables
+  - name: Requests
+    description: Demandes de nouvelles fiches
+
+paths:
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Lister toutes les catégories
+      responses:
+        '200':
+          description: Liste des catégories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+  /fiches:
+    get:
+      tags: [Fiches]
+      summary: Lister les fiches, avec filtres optionnels
+      parameters:
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/Category'
+        - name: level
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3
+        - name: search
+          in: query
+          description: Recherche par mot-clé dans le titre ou les tags
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liste des fiches correspondant aux filtres
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Fiche'
+    post:
+      tags: [Fiches]
+      summary: Créer une nouvelle fiche
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewFiche'
+      responses:
+        '201':
+          description: Fiche créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fiche'
+        '401':
+          description: Clé API manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fiches/{ficheId}:
+    parameters:
+      - name: ficheId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Fiches]
+      summary: Récupérer le détail d'une fiche
+      responses:
+        '200':
+          description: Détail de la fiche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fiche'
+        '404':
+          description: Fiche non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Fiches]
+      summary: Modifier une fiche existante
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewFiche'
+      responses:
+        '200':
+          description: Fiche mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fiche'
+        '401':
+          description: Clé API manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Fiche non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Fiches]
+      summary: Supprimer une fiche
+      security:
+        - AdminKey: []
+      responses:
+        '204':
+          description: Fiche supprimée
+        '401':
+          description: Clé API manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Fiche non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fiches/{ficheId}/validate:
+    post:
+      tags: [Fiches]
+      summary: Marquer une fiche comme lue et comprise (donne de l'XP)
+      parameters:
+        - name: ficheId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateRequest'
+      responses:
+        '200':
+          description: Fiche validée, profil utilisateur mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Fiche ou utilisateur non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users:
+    post:
+      tags: [Users]
+      summary: Créer un profil anonyme
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewUser'
+      responses:
+        '201':
+          description: Profil créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Récupérer le profil d'un utilisateur
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Profil de l'utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Utilisateur non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ranks:
+    get:
+      tags: [Ranks]
+      summary: Lister tous les rangs et leurs seuils d'XP
+      responses:
+        '200':
+          description: Liste des rangs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rank'
+
+  /badges:
+    get:
+      tags: [Badges]
+      summary: Lister tous les badges disponibles
+      responses:
+        '200':
+          description: Liste des badges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Badge'
+
+  /requests:
+    post:
+      tags: [Requests]
+      summary: Soumettre une demande de fiche
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewFicheRequest'
+      responses:
+        '201':
+          description: Demande enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FicheRequest'
+    get:
+      tags: [Requests]
+      summary: Lister toutes les demandes
+      security:
+        - AdminKey: []
+      responses:
+        '200':
+          description: Liste des demandes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FicheRequest'
+        '401':
+          description: Clé API manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /requests/{requestId}:
+    patch:
+      tags: [Requests]
+      summary: Mettre à jour le statut d'une demande
+      security:
+        - AdminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRequestStatus'
+      responses:
+        '200':
+          description: Demande mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FicheRequest'
+        '401':
+          description: Clé API manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Demande non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    AdminKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >
+        Clé secrète connue uniquement de l'administrateur (toi).
+        Nécessaire pour créer/modifier/supprimer des fiches et gérer les demandes.
+
+  schemas:
+    Category:
+      type: string
+      enum: [cyber-attack, cyber-defense, osint, reseaux]
+      example: osint
+
+    Fiche:
+      type: object
+      required: [id, title, category, description, content, level, xpReward]
+      properties:
+        id:
+          type: string
+          example: fiche-042
+        title:
+          type: string
+          example: "Phishing : reconnaître une attaque"
+        category:
+          $ref: '#/components/schemas/Category'
+        description:
+          type: string
+          example: "Les techniques courantes de phishing et comment les repérer."
+        content:
+          type: string
+          example: "## Qu'est-ce que le phishing ?\nLe phishing est une technique..."
+        keywords:
+          type: array
+          items:
+            type: string
+          example: [phishing, social-engineering, email]
+        level:
+          type: integer
+          minimum: 1
+          maximum: 3
+          example: 2
+        xpReward:
+          type: integer
+          example: 20
+
+    NewFiche:
+      type: object
+      required: [title, category, description, content, level, xpReward]
+      properties:
+        title:
+          type: string
+          example: "Phishing : reconnaître une attaque"
+        category:
+          $ref: '#/components/schemas/Category'
+        description:
+          type: string
+          example: "Les techniques courantes de phishing et comment les repérer."
+        content:
+          type: string
+          example: "## Qu'est-ce que le phishing ?\nLe phishing est une technique..."
+        keywords:
+          type: array
+          items:
+            type: string
+          example: [phishing, social-engineering, email]
+        level:
+          type: integer
+          minimum: 1
+          maximum: 3
+          example: 2
+        xpReward:
+          type: integer
+          example: 20
+
+    User:
+      type: object
+      required: [id, pseudo, xp, rank]
+      properties:
+        id:
+          type: string
+          example: user-7f3a
+        pseudo:
+          type: string
+          example: Neo
+        xp:
+          type: integer
+          example: 130
+        rank:
+          type: string
+          example: "Débutant Cyber"
+        badges:
+          type: array
+          items:
+            type: string
+          example: ["Première Connexion", "Curieux"]
+        fichesValidees:
+          type: array
+          items:
+            type: string
+          example: [fiche-001, fiche-012]
+
+    NewUser:
+      type: object
+      properties:
+        pseudo:
+          type: string
+          example: Trinity
+
+    ValidateRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          example: user-7f3a
+
+    Rank:
+      type: object
+      required: [name, xpRequired]
+      properties:
+        name:
+          type: string
+          example: Pentester
+        xpRequired:
+          type: integer
+          example: 600
+
+    Badge:
+      type: object
+      required: [id, name, description]
+      properties:
+        id:
+          type: string
+          example: network-ninja
+        name:
+          type: string
+          example: "Network Ninja"
+        description:
+          type: string
+          example: "Valider toutes les fiches de la catégorie Réseaux"
+
+    FicheRequest:
+      type: object
+      required: [id, firstName, title, description, category, status]
+      properties:
+        id:
+          type: string
+          example: req-018
+        firstName:
+          type: string
+          example: Sam
+        title:
+          type: string
+          example: "Les bases du chiffrement asymétrique"
+        description:
+          type: string
+          example: "J'aimerais une fiche qui explique RSA simplement, avec un schéma."
+        category:
+          $ref: '#/components/schemas/Category'
+        status:
+          type: string
+          enum: [pending, done]
+          example: pending
+
+    NewFicheRequest:
+      type: object
+      required: [firstName, title, description, category]
+      properties:
+        firstName:
+          type: string
+          example: Sam
+        title:
+          type: string
+          example: "Les bases du chiffrement asymétrique"
+        description:
+          type: string
+          example: "J'aimerais une fiche qui explique RSA simplement, avec un schéma."
+        category:
+          $ref: '#/components/schemas/Category'
+
+    UpdateRequestStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, done]
+          example: done
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: "Fiche non trouvée"
